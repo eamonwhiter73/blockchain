@@ -76,6 +76,9 @@ class Blockchain(object):
 
         return proof
 
+    def subtract_block(self):
+        del self.chain[-1]
+
     @staticmethod
     def valid_proof(last_proof, proof):
         """
@@ -87,7 +90,7 @@ class Blockchain(object):
 
         guess = f'{last_proof}{proof}'.encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
-        return guess_hash[:4] == "0000"
+        return guess_hash[:5] == "00000"
 
     @property
     def last_block(self):

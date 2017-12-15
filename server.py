@@ -13,41 +13,42 @@ node_identifier = str(uuid4()).replace('-', '')
 
 # Instantiate the Blockchain
 blockchain = Blockchain()
+waiting = False
 
 @app.route('/mine', methods=['GET'])
 def mine():
-    # We run the proof of work algorithm to get the next proof...
-    last_block = blockchain.last_block
-    pprint(last_block)
+    if not waiting:
+        # We run the proof of work algorithm to get the next proof...
+        last_block = blockchain.last_block
+        print("\n Last_block:\n")
+        pprint(last_block)
+        #print("\n whole_chain:\n")
+        #pprint(blockchain.chain)
 
-    print("last block")
-    print("last block")
-    print("last block")
+        last_proof = last_block['proof']
+        proof = blockchain.proof_of_work(last_proof)
 
-    last_proof = last_block['proof']
-    proof = blockchain.proof_of_work(last_proof)
+        # We must receive a reward for finding the proof.
+        # The sender is "0" to signify that this node has mined a new coin.
+        blockchain.new_transaction(
+            sender="0",
+            recipient=node_identifier,
+            amount=1,
+        )
 
-    # We must receive a reward for finding the proof.
-    # The sender is "0" to signify that this node has mined a new coin.
-    blockchain.new_transaction(
-        sender="0",
-        recipient=node_identifier,
-        amount=1,
-    )
+        # Forge the new Block by adding it to the chain
+        previous_hash = blockchain.hash(last_block)
+        block = blockchain.new_block(proof, previous_hash)
 
-    # Forge the new Block by adding it to the chain
-    previous_hash = blockchain.hash(last_block)
-    block = blockchain.new_block(proof, previous_hash)
+        response = { 'message': "New Block Forged",
+            'index': block['index'],
+            'transactions': block['transactions'],
+            'proof': block['proof'],
+            'previous_hash': block['previous_hash'],
+            'node': node_identifier
+        }
 
-    response = { 'message': "New Block Forged",
-        'index': block['index'],
-        'transactions': block['transactions'],
-        'proof': block['proof'],
-        'previous_hash': block['previous_hash'],
-        'node': node_identifier
-    }
-
-    return sjson.dumps(response), 200
+        return jsonify(response), 200
 
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():
@@ -68,13 +69,9 @@ def new_transaction():
 def validate():
     
     proof = request.args.get('proof')
-    #print(str(values['proof']) + " : proof")
-    #required = ['proof']
 
-    # We run the proof of work algorithm to get the next proof...
     last_block = blockchain.last_block
     last_proof = last_block['proof']
-    #proof = values['proof']
 
     if blockchain.valid_proof(last_proof, proof):
         response = { 'add': True }
@@ -101,21 +98,11 @@ def chain_length():
 @app.route('/give_chain', methods=['GET'])
 def give_chain():
 
-    print("\n //// REQUEST PRINTED - previous hash sent:\n")
-    pprint(request.args)
-    print("\n")
-    var = request.args['previous']
+    var = request.args.get('previous')
     return_arr = []
 
-    print("\n //// my_full_chain:\n")
-    pprint(blockchain.chain)
-    print("\n")
-
     for index, item in enumerate(blockchain.chain):
-        print("\n //// ENUMERATING - from self blockchain:\n")
-        pprint(item)
-        print("\n")
-        if item['previous_hash'] is {} and item['previous_hash'] == var:
+        if item['previous_hash'] == var:
             print("\n //// previous_hash is object and == request_previous_hash - getting chunk")
             return_arr = blockchain.chain[(index + 1):]
             method = 'partial'
@@ -135,40 +122,39 @@ def give_chain():
     
     return jsonify(response), 200
 
+@app.route('/start_mine', methods=['GET'])
+def start_mine():
+
+    waiting = False
+    return jsonify({'message': 'mining started'}), 200
+
+@app.route('/stop_mine', methods=['GET'])
+def stop_mine():
+
+    waiting = True
+    return jsonify({'message': 'mining stopped'}), 200
+
 @app.route('/previous', methods=['GET'])
 def previous():
 
     return jsonify(blockchain.last_block['previous_hash']), 200
 
-@app.route('/add_validated_block', methods=['POST'])
-def add_validated_block():
-    values = request.get_json()
+@app.route('/subtract_block', methods=['GET'])
+def subtract_block():
 
-    pprint(values)
-    print("add validated block 77777777777777777")
-    print("add validated block 77777777777777777")
-    print("add validated block 77777777777777777")
-
-    blockchain.add_validated_block(values)
+    blockchain.subtract_block()
 
     response = {
-        'result': "block added"
+        'result': "block removed"
     }
 
-    return jsonify(result), 200
+    return jsonify(response), 200
 
 @app.route('/add_chain', methods=['POST'])
 def add_chain():
-    print("INSIDE ADD CHAIN PRINTING REQUESTS:")
     values = request.get_json()
-    pprint(request.form)
-    pprint(request.args)
 
-    pprint(values)
     chain = values['chain']
-    print("chain -----00--0------")
-    print("chain -----00--0------")
-    print("chain -----00--0------")
 
     if values['method'] == 'whole' and len(chain) > len(blockchain.chain):
         blockchain.chain =[]
@@ -178,6 +164,7 @@ def add_chain():
 
     response = {
         'length': len(blockchain.chain),
+        'message': 'chain added'
     }
     return jsonify(response), 200
 
