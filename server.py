@@ -15,6 +15,9 @@ node_identifier = str(uuid4()).replace('-', '')
 blockchain = Blockchain()
 waiting = False
 
+def by_index_key(block):
+    return block['index']
+
 @app.route('/mine', methods=['GET'])
 def mine():
     if not waiting:
@@ -69,14 +72,12 @@ def new_transaction():
 def validate():
     
     proof = request.args.get('proof')
-
-    last_block = blockchain.last_block
-    last_proof = last_block['proof']
+    last_proof = request.args.get('last_proof')
 
     if blockchain.valid_proof(last_proof, proof):
         response = { 'add': True }
     else:
-        response = { 'add': False }
+        response = { 'add': False } # HACK CHANGE TO FALSE WHEN USING SAME PROOF OF WORK ZERO AMOUNT 
 
     return jsonify(response), 200
 
@@ -98,21 +99,24 @@ def chain_length():
 @app.route('/give_chain', methods=['GET'])
 def give_chain():
 
-    var = request.args.get('previous')
+    previous = request.args.get('previous')
+    start_at = request.args.get('start_at_index')
+    increment_by = request.args.get('increment_by')
     return_arr = []
+    previous_found = False
 
     for index, item in enumerate(blockchain.chain):
-        if item['previous_hash'] == var:
-            print("\n //// previous_hash is object and == request_previous_hash - getting chunk")
-            return_arr = blockchain.chain[(index + 1):]
+        if item['previous_hash'] == previous:
+            previous_found = True
+            return_arr = blockchain.chain[(index + int(start_at) + 1):int(increment_by)]
             method = 'partial'
-        else:
-            if index == (len(blockchain.chain) - 1):
-                return_arr = blockchain.chain[:]
-                print("\n //// Returning whole array below:\n")
-                pprint(return_arr)
-                print("\n")
-                method = 'whole'
+
+    if not previous_found:
+        return_arr = blockchain.chain[:]
+        print("\n //// Returning whole array below:\n")
+        pprint(return_arr)
+        print("\n")
+        method = 'whole'
 
     response = {
         'chain': return_arr,
@@ -137,7 +141,7 @@ def stop_mine():
 @app.route('/previous', methods=['GET'])
 def previous():
 
-    return jsonify(blockchain.last_block['previous_hash']), 200
+    return jsonify(blockchain.last_block), 200
 
 @app.route('/subtract_block', methods=['GET'])
 def subtract_block():
@@ -153,11 +157,22 @@ def subtract_block():
 @app.route('/add_chain', methods=['POST'])
 def add_chain():
     values = request.get_json()
+    print('\n //// values in add chain parameters json\n')
+    pprint(values)
 
-    chain = values['chain']
+    # Check that the required fields are in the POST'ed data
+    required = ['chain']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
 
-    if values['method'] == 'whole' and len(chain) > len(blockchain.chain):
-        blockchain.chain =[]
+    chain = sorted(values['chain'], key = by_index_key)
+
+    print('\n //// index of first in the chain')
+    print(str(values['chain'][0]['index']))
+
+    if values['chain'][0]['index'] == 1:
+        print('\n //// Getting whole chain on server side')
+        blockchain.chain = []
 
     for index, item in enumerate(chain):
         blockchain.chain.append(item)
@@ -166,6 +181,7 @@ def add_chain():
         'length': len(blockchain.chain),
         'message': 'chain added'
     }
+
     return jsonify(response), 200
 
 if __name__ == '__main__':
