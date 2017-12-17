@@ -72,6 +72,9 @@ while 1:
         ]
 
         results = grequests.map(reqs, exception_handler=exception_handler)
+        print('\n //// results from previous and mine\n')
+        print(results.__class__)
+        pprint(results)
 
         print('\n //// last block mined\n')
 
@@ -163,7 +166,8 @@ while 1:
                     pprint(json.loads(blocks[0]))
                     if json.loads(blocks[0])['message'] == 'New Block Forged':
                         #validate block
-                        r = requests.get('http://0.0.0.0:'+port+'/validate', params = {'last_proof': json.loads(blocks[1])['proof'], 'proof': json.loads(blocks[0])['proof']})
+                        headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+                        r = requests.post('http://0.0.0.0:'+port+'/validate', json = {'last_block': blocks[1], 'this_block': blocks[0]}, headers=headers)
                         print('\n //// response from validate:\n')
                         print(r.text)
                         if json.loads(r.text)['add']:

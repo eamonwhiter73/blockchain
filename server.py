@@ -68,11 +68,18 @@ def new_transaction():
     response = {'message': f'Transaction will be added to Block {index}'}
     return jsonify(response), 201
 
-@app.route('/validate', methods=['GET']) # MIGHT MESS SOMETHING UP CHANGED FROM POST
+@app.route('/validate', methods=['POST']) # MIGHT MESS SOMETHING UP CHANGED FROM POST
 def validate():
     
-    proof = request.args.get('proof')
-    last_proof = request.args.get('last_proof')
+    print('\n //// request.args\n')
+    pprint(request.get_json())
+    print('\n //// this_block\n')
+    pprint(json.loads(request.get_json()['this_block']))
+    print('\n //// last_block\n')
+    pprint(json.loads(request.get_json()['last_block']))
+
+    last_proof = json.loads(request.get_json()['last_block'])['proof']
+    proof = json.loads(request.get_json()['this_block'])['proof']
 
     if blockchain.valid_proof(last_proof, proof):
         response = { 'add': True }
