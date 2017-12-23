@@ -5,9 +5,9 @@ import requests
 from pprint import pprint
 import json
 
-#Setup node's p2p node.
-#node = Net(passive_bind='192.168.1.129', passive_port=44447, node_type='passive', debug=1)
-node = Net(passive_bind='192.168.1.149', passive_port=44446, node_type='passive', debug=1)
+#Setup node's p2p node. copied
+node = Net(passive_bind='192.168.1.129', passive_port=44447, node_type='passive', debug=1)
+#node = Net(passive_bind='192.168.1.149', passive_port=44446, node_type='passive', debug=1)
 #node = Net(passive_bind='192.168.1.131', passive_port=44445, node_type='passive', debug=1)
 node.start()
 node.bootstrap()

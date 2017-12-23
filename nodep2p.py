@@ -6,6 +6,7 @@ from pprint import pprint
 import json
 
 #Setup node's p2p node.
+#node = Net(passive_bind='192.168.1.129', passive_port=44447, node_type='passive', debug=1)
 #node = Net(passive_bind='192.168.1.149', passive_port=44446, node_type='passive', debug=1)
 node = Net(passive_bind='192.168.1.131', passive_port=44445, node_type='passive', debug=1)
 node.start()
@@ -19,11 +20,11 @@ first_time = True
 i_need_the_chain = False
 my_chain_length = 0
 mining = True
-fully_validated_count = 0
-fully_validated = False
 mined_block = ''
 previous_block = ''
 did_mine_block = False
+#fully_validated_count = 0
+replies = []
 
 def exception_handler(request, exception):
     print("Request failed")
@@ -37,11 +38,11 @@ def chain_length_check(ip, in_port):
     results = grequests.map(reqs, exception_handler=exception_handler)
     return results
 
-def put_chains_together():
+def put_chains_together(prev_hash):
     reqs = []
     above_previous = 0
     for index, item in enumerate(connections):
-        reqs.append(grequests.get("http://" + item['ip'] + ":" + item['port'] + "/give_chain", params = {'previous':json.loads(previous_block)['previous_hash'], 'start_at_index':above_previous, 'increment_by':int(my_chain_length / len(connections))}))
+        reqs.append(grequests.get("http://" + item['ip'] + ":" + item['port'] + "/give_chain", params = {'previous': prev_hash, 'start_at_index':above_previous, 'increment_by':int(my_chain_length / len(connections))}))
         above_previous += int(my_chain_length / len(connections))
 
     request_chain_results = grequests.map(reqs, exception_handler=exception_handler)
@@ -62,10 +63,9 @@ def show_json(result):
     print(result.status_code)
     return json.loads(result.content.decode())
 
-while 1:
+def mine():
+    if len(connections) == 0 or (not first_time and mining):
 
-    if (not first_time or len(connections) == 0) and mining:
-        
         reqs = [
             grequests.get('http://0.0.0.0:'+port+'/previous'),
             grequests.get('http://0.0.0.0:'+port+'/mine')
@@ -88,9 +88,16 @@ while 1:
         #send block out to be validated
         did_mine_block = True
 
-    if len(connections) > 0 and i_need_the_chain:
     
-        all_chains = put_chains_together()
+
+while 1:
+
+    mine()
+
+    if len(connections) > 0 and i_need_the_chain:
+        
+        prev_hash = json.loads(previous_block)['previous_hash']
+        all_chains = put_chains_together(prev_hash)
 
         headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
         r = requests.post('http://0.0.0.0:'+port+'/add_chain', json = {'chain': all_chains}, headers=headers)
@@ -101,6 +108,20 @@ while 1:
 
     for con in node:
         con.send_line(port)
+
+        mine()
+
+        if len(connections) > 0 and i_need_the_chain:
+            
+            prev_hash = json.loads(previous_block)['previous_hash']
+            all_chains = put_chains_together(prev_hash)
+
+            headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+            r = requests.post('http://0.0.0.0:'+port+'/add_chain', json = {'chain': all_chains}, headers=headers)
+            print("\n ////new_chain_length\n")
+            print(r.text) 
+
+            i_need_the_chain = False
 
         if did_mine_block:
             con.send_line(mined_block+';'+previous_block)
@@ -123,6 +144,7 @@ while 1:
                 if not found:
                     print('\n //// Adding connection to connections\n')
                     connections.append({'ip': con.addr, 'port': reply})
+                    con.send_line(port)
 
                 if first_time:
                     results = chain_length_check(con.addr, reply)
@@ -141,21 +163,24 @@ while 1:
                     first_time = False
 
             elif ('validated'+json.loads(mined_block)['node']) in reply:
-                fully_validated_count+=1
-                if fully_validated_count == len(connections):
-                    fully_validated = True
-                    fully_validated_count = 0
-                    mining = True
-                    did_mine_block = False
+                replies.append(reply)
+                print('\n //// received validated message\n')
+                print(str(len(replies)) + ': replies\n')
+                print(str(len(connections)) + ': connections\n')
 
+                if len(replies) == len(connections):
+                    mining = True
+                    replies = []
                     print('\n //// I am fully validated ////\n')
                 else:
+
                     print('\n //// still not there - waiting for validations to come in\n')
 
             elif ('invalid'+json.loads(mined_block)['node']) in reply:
                 print('\n //// I have an invalid block ////\n')
                 r = requests.get('http://0.0.0.0:'+port+'/subtract_block')
                 if json.loads(r.text)['result'] == 'block removed':
+                    mined_block = ''
                     print('\n //// block removed\n')
                     mining = True
 
@@ -172,8 +197,11 @@ while 1:
                         print(r.text)
                         if json.loads(r.text)['add']:
                             print('\n //// sending out that the block is valid')
+                            con.send_line(port)
                             con.send_line('validated'+json.loads(blocks[0])['node'])
                         else:
                             print('\n //// sending out that the block is invalid')
+                            con.send_line(port)
                             con.send_line('invalid'+json.loads(blocks[0])['node'])
+
     time.sleep(1)

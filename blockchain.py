@@ -3,6 +3,7 @@ import hashlib
 import json
 from textwrap import dedent
 from time import time
+import os
 
 class Blockchain(object):
     def __init__(self):
@@ -32,18 +33,8 @@ class Blockchain(object):
         self.current_transactions = []
 
         self.chain.append(block)
-        return block
 
-    def add_validated_block(self, block):
-        """
-        Create a new Block in the Blockchain
-        :param proof: <int> The proof given by the Proof of Work algorithm
-        :param previous_hash: (Optional) <str> Hash of previous Block
-        :return: <dict> New Block
-        """
-        # Reset the current list of transactions
-        self.current_transactions = []
-        self.chain.append(block)
+        return block
 
     def new_transaction(self, sender, recipient, amount):
         """
