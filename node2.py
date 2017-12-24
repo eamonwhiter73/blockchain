@@ -88,25 +88,46 @@ def put_chains_together():
 
     chains_to_add = [show_json(result) for result in request_chain_results]
     
+    prev_chain = {'chain':[]}
     all_chains = []
-    for chain in chains_to_add:
-        print('\n //// chain in chains_to_add')
-        pprint(chain)
+    for i, chain in enumerate(chains_to_add):
+        if len(prev_chain['chain']) > 0 and len(chain['chain']) > 0:
+            print('\n //// last block previous chain, first block current chain - check difference')
+            pprint(prev_chain['chain'][-1])
+            pprint(chain['chain'][0])
+            last_block_prev_chain = prev_chain['chain'][-1]
+            first_block_cur_chain = chain['chain'][0]
+            if first_block_cur_chain['index'] > last_block_prev_chain['index'] + 1:
+                chain_diff = first_block_cur_chain['index'] - last_block_prev_chain['index']
+                r = requests.get("http://" + connections[-1]['ip'] + ":" + connections[-1]['port'] + "/give_chain", params = {'previous': last_block_prev_chain['previous_hash'], 'start_at_index':0, 'increment_by':chain_diff})
+                missing_chain = json.loads(r.text)['chain']
+                print('\n //// this is the missing chain')
+                pprint(missing_chain)
+                if len(missing_chain) > 0:
+                    #del missing_chain[-(chain_diff + 2):-chain_diff]
+                    for block in missing_chain[::-1]:
+                        chain['chain'].insert(0, block)
+
         prev = {}
         for index, ch in enumerate(chain['chain']):
             deleted = False
             if index > 0 and ch['index'] == prev['index']:
                 if ch['timestamp'] < prev['timestamp']:
                     del chain['chain'][index - 1]
-                    deleted = True
                 else:
                     del chain['chain'][index]
-                    deleted = True
+                
+                deleted = True
 
             if not deleted: 
                 all_chains.append(ch)
 
             prev = ch
+
+        if len(chain['chain']) > 0:
+            prev_chain = chain
+        else:
+            print('chain["chain"] is empty, moving on, saving previous')
 
 
     all_chains = sorted(all_chains, key = by_index_key)
@@ -173,6 +194,7 @@ while 1:
             mining = False
 
         for reply in con:
+            # if i send back my port do i ever need to do it again? first ping to network - receive - send back my port
             if reply.isdigit():
                 found = False
                 for index, item in enumerate(connections):
