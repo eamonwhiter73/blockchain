@@ -25,6 +25,16 @@ node_identifier = str(uuid4()).replace('-', '')
 # Instantiate the Blockchain
 blockchain = Blockchain()
 
+first_time = True
+f = open('blockchain.txt')
+for line in f.readlines():
+    if first_time:
+        blockchain.chain = []
+        first_time = False
+        
+    print('loading chain...')
+    blockchain.chain.append(json.loads(line))
+
 @app.route('/mine', methods=['GET'])
 def mine():
     print('\n //// in mine in mine ... ////')

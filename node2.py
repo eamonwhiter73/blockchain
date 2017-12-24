@@ -66,7 +66,7 @@ def put_chains_together():
     connections = sorted(connections, key = by_connection_length_key)
 
     if len(connections) > 0:
-        increment = int(connections[len(connections) - 1]['length'] / len(connections))
+        increment = math.ceil(connections[len(connections) - 1]['length'] / len(connections))
 
     increments = []
     start_ats = [0]
@@ -92,8 +92,22 @@ def put_chains_together():
     for chain in chains_to_add:
         print('\n //// chain in chains_to_add')
         pprint(chain)
-        for ch in chain['chain']:
-            all_chains.append(ch)
+        prev = {}
+        for index, ch in enumerate(chain['chain']):
+            deleted = False
+            if index > 0 and ch['index'] == prev['index']:
+                if ch['timestamp'] < prev['timestamp']:
+                    del chain['chain'][index - 1]
+                    deleted = True
+                else:
+                    del chain['chain'][index]
+                    deleted = True
+
+            if not deleted: 
+                all_chains.append(ch)
+
+            prev = ch
+
 
     all_chains = sorted(all_chains, key = by_index_key)
 
